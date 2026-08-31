@@ -236,6 +236,6 @@ def run_metropolis(L, beta, J, h, N, init_sweeps, sample_interval):
     mag_per_site = mag / (state.shape[0] * state.shape[1])
     mag_var = np.var(M_arr) / ((state.shape[0] * state.shape[1])**2)
 
+    absmag = (np.abs(M_arr)).mean()
     
-
-    return 1/beta, energy_per_site, energy_var, mag_per_site, mag_var, abs(mag_per_site)
+    return 1/beta, energy_per_site, energy_var, mag_per_site, mag_var, absmag

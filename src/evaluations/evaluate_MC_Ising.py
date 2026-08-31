@@ -10,7 +10,7 @@ print(temperatures)
 L = 10
 
 for i, T in enumerate(temperatures):
-    Temp, e, evar, m, mvar, absm = run_metropolis(L, 1/T, -1, 1e-2, 3000, 200000, 1000)
+    Temp, e, evar, m, mvar, absm = run_metropolis(L, 1/T, -1, 1e-2, 3000, 2*10^3*(L**2), 10*(L**2))
 
     row = pd.DataFrame([{"Linear_size": L,
                      "Temperature": Temp,
