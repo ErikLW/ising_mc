@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from ising-mc!")
+from ising_mc.functions.function_defs import run_metropolis

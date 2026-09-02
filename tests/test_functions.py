@@ -1,8 +1,11 @@
 import numpy as np
+
+from ising_mc.functions.function_defs import get_neighbors
+from ising_mc.functions.function_defs import H
+from ising_mc.functions.function_defs import dH
+from ising_mc.functions.function_defs import metropolis_step
+
 import pytest
-
-exec(open("src/functions/function_defs.py").read())
-
 
 def test_get_neighbors():
     L = 6

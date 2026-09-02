@@ -1,3 +1,5 @@
+import numpy as np
+
 def random_config(L):
     """Generate a random spin configuration on an ``L x L`` square lattice.
 
