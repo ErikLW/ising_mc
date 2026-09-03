@@ -187,7 +187,15 @@ def metropolis_step(state,beta, J, h):
 
 
 def run_metropolis(
-    L, beta, J, h, num_samples, burn_in_steps, steps_between_samples
+    L,
+    beta,
+    J,
+    h,
+    num_samples,
+    burn_in_steps,
+    steps_between_samples,
+    *,
+    return_configurations=False,
 ):
     """Run a Metropolis Monte Carlo simulation of the square-lattice Ising model.
 
@@ -216,6 +224,9 @@ def run_metropolis(
     steps_between_samples : int
         Number of single-spin Metropolis steps performed between successive
         recorded samples.
+    return_configurations : bool, keyword-only, optional
+        If ``True``, retain and return a copy of the spin configuration at
+        every sampling point. The default is ``False``.
 
     Returns
     -------
@@ -234,6 +245,9 @@ def run_metropolis(
         the number of lattice sites.
     abs_mag_per_site : float
         Absolute value of the mean magnetization per site.
+    sampled_configurations : numpy.ndarray, optional
+        Array with shape ``(num_samples, L, L)`` containing the sampled spin
+        configurations. Returned only when ``return_configurations=True``.
     """
     state = random_config(L)
     energy = H(state, J, h)
@@ -248,10 +262,17 @@ def run_metropolis(
 
     H_arr = np.empty(num_samples)
     M_arr = np.empty(num_samples)
+    sampled_configurations = None
+    if return_configurations:
+        sampled_configurations = np.empty(
+            (num_samples, *state.shape), dtype=state.dtype
+        )
 
     for sample_index in range(num_samples):
         H_arr[sample_index] = energy
         M_arr[sample_index] = magnetization
+        if sampled_configurations is not None:
+            sampled_configurations[sample_index] = state
 
         for _ in range(steps_between_samples):
             delta_energy, delta_magnetization = _attempt_metropolis_update(
@@ -271,5 +292,15 @@ def run_metropolis(
     mag_var = np.var(M_arr) / ((state.shape[0] * state.shape[1])**2)
 
     absmag = (np.abs(M_arr)).mean()
-    
-    return 1/beta, energy_per_site, energy_var, mag_per_site, mag_var, absmag
+
+    observables = (
+        1/beta,
+        energy_per_site,
+        energy_var,
+        mag_per_site,
+        mag_var,
+        absmag,
+    )
+    if sampled_configurations is not None:
+        return *observables, sampled_configurations
+    return observables

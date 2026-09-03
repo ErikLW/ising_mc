@@ -7,6 +7,7 @@ from ising_mc.functions.function_defs import H
 from ising_mc.functions.function_defs import M
 from ising_mc.functions.function_defs import dH
 from ising_mc.functions.function_defs import metropolis_step
+from ising_mc.functions.function_defs import run_metropolis
 
 import pytest
 
@@ -121,3 +122,61 @@ def test_accepted_update_reports_observable_changes(monkeypatch):
 
     assert initial_energy + delta_energy == H(state, J=-1, h=0)
     assert initial_magnetization + delta_magnetization == M(state)
+
+
+def test_run_metropolis_does_not_return_configurations_by_default():
+    result = run_metropolis(
+        L=2,
+        beta=1,
+        J=-1,
+        h=0,
+        num_samples=1,
+        burn_in_steps=0,
+        steps_between_samples=0,
+    )
+
+    assert len(result) == 6
+
+
+def test_run_metropolis_returns_sampled_configurations(monkeypatch):
+    initial_state = np.ones((2, 2), dtype=int)
+    positions = iter([(0, 0), (0, 1), (1, 0)])
+
+    monkeypatch.setattr(
+        "ising_mc.functions.function_defs.random_config",
+        lambda L: initial_state.copy(),
+    )
+
+    def flip_next_spin(state, beta, J, h):
+        pos = next(positions)
+        magnetization_change = -2 * state[pos]
+        state[pos] *= -1
+        return 0, magnetization_change
+
+    monkeypatch.setattr(
+        "ising_mc.functions.function_defs._attempt_metropolis_update",
+        flip_next_spin,
+    )
+
+    result = run_metropolis(
+        L=2,
+        beta=1,
+        J=0,
+        h=0,
+        num_samples=3,
+        burn_in_steps=0,
+        steps_between_samples=1,
+        return_configurations=True,
+    )
+
+    sampled_configurations = result[-1]
+    expected_configurations = np.array(
+        [
+            [[1, 1], [1, 1]],
+            [[-1, 1], [1, 1]],
+            [[-1, -1], [1, 1]],
+        ]
+    )
+
+    assert len(result) == 7
+    np.testing.assert_array_equal(sampled_configurations, expected_configurations)
