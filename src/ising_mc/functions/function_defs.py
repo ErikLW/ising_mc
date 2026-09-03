@@ -48,6 +48,22 @@ def get_neighbors(state, pos):
     return neighbors
 
 
+def sum_neighbors(state, pos):
+    """Return the sum of the four nearest-neighbor spins at ``pos``.
+
+    Periodic boundary conditions are applied. Unlike :func:`get_neighbors`,
+    this function avoids allocating an intermediate array.
+    """
+    L, _ = state.shape
+    i, j = pos
+    return (
+        state[(i + 1) % L, j % L]
+        + state[(i - 1) % L, j % L]
+        + state[i % L, (j + 1) % L]
+        + state[i % L, (j - 1) % L]
+    )
+
+
 def H(state, J, h):
     """Compute the Ising energy of a spin configuration.
 
@@ -123,8 +139,21 @@ def dH(state, pos, J, h):
         single-spin flip.
     """
     dh = - 2 * h * state[pos] 
-    dJ = - 2 * J * state[pos] * np.sum(get_neighbors(state,pos))
+    dJ = - 2 * J * state[pos] * sum_neighbors(state, pos)
     return dh + dJ
+
+
+def _attempt_metropolis_update(state, beta, J, h):
+    """Attempt one spin flip and return its accepted observable changes."""
+    pos = tuple(np.random.randint(s) for s in state.shape)
+    delta_energy = dH(state, pos, J, h)
+
+    if delta_energy <= 0 or np.random.uniform() < np.exp(-beta * delta_energy):
+        magnetization_change = -2 * state[pos]
+        state[pos] *= -1
+        return delta_energy, magnetization_change
+
+    return 0.0, 0
 
 
 def metropolis_step(state,beta, J, h):
@@ -153,24 +182,19 @@ def metropolis_step(state,beta, J, h):
         The updated spin configuration. This is the same array object as the
         input ``state``, with one spin flipped if the proposal was accepted.
     """
-    L, _ = state.shape
-    pos = tuple(np.random.randint(s) for s in state.shape)#random tuple from 0:L-1
-    r = np.random.uniform()
-    comp = np.exp(-beta * dH(state, pos, J, h))
-    if r < comp:
-        state[pos] *= -1
-        return state
-    else:
-        return state
+    _attempt_metropolis_update(state, beta, J, h)
+    return state
 
 
-def run_metropolis(L, beta, J, h, N, init_sweeps, sample_interval):
+def run_metropolis(
+    L, beta, J, h, num_samples, burn_in_steps, steps_between_samples
+):
     """Run a Metropolis Monte Carlo simulation of the square-lattice Ising model.
 
     The simulation starts from a random spin configuration. It first performs
-    ``init_sweeps`` single-spin Metropolis steps as burn-in. It then records
-    ``N`` samples of the total energy and magnetization, performing
-    ``sample_interval`` single-spin Metropolis steps between successive
+    ``burn_in_steps`` single-spin Metropolis steps as burn-in. It then records
+    ``num_samples`` samples of the total energy and magnetization, performing
+    ``steps_between_samples`` single-spin Metropolis steps between successive
     recorded samples.
 
     Parameters
@@ -184,12 +208,12 @@ def run_metropolis(L, beta, J, h, N, init_sweeps, sample_interval):
         Coupling strength between nearest-neighbor spins.
     h : float
         External magnetic-field strength.
-    N : int
+    num_samples : int
         Number of samples used to evaluate the reported observables.
-    init_sweeps : int
+    burn_in_steps : int
         Number of initial single-spin Metropolis steps discarded as burn-in
         before sampling begins.
-    sample_interval : int
+    steps_between_samples : int
         Number of single-spin Metropolis steps performed between successive
         recorded samples.
 
@@ -212,21 +236,29 @@ def run_metropolis(L, beta, J, h, N, init_sweeps, sample_interval):
         Absolute value of the mean magnetization per site.
     """
     state = random_config(L)
+    energy = H(state, J, h)
+    magnetization = M(state)
 
-    for i in range(init_sweeps):
-        state = metropolis_step(state, beta, J, h)
+    for _ in range(burn_in_steps):
+        delta_energy, delta_magnetization = _attempt_metropolis_update(
+            state, beta, J, h
+        )
+        energy += delta_energy
+        magnetization += delta_magnetization
 
-    H_arr = np.array([])
-    H_var_arr = np.array([])
-    M_arr = np.array([])
-    M_var_arr = np.array([])
+    H_arr = np.empty(num_samples)
+    M_arr = np.empty(num_samples)
 
-    for i in range(N):
-        H_arr = np.append(H_arr, H(state, J, h))
-        M_arr = np.append(M_arr, M(state))
+    for sample_index in range(num_samples):
+        H_arr[sample_index] = energy
+        M_arr[sample_index] = magnetization
 
-        for i in range(sample_interval):
-            state = metropolis_step(state, beta, J, h)
+        for _ in range(steps_between_samples):
+            delta_energy, delta_magnetization = _attempt_metropolis_update(
+                state, beta, J, h
+            )
+            energy += delta_energy
+            magnetization += delta_magnetization
 
     energy = np.mean(H_arr)
     energy_per_site = energy / (state.shape[0] * state.shape[1])

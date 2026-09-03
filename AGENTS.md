@@ -15,6 +15,7 @@
 - Run tests: `uv run pytest`
 
 ## Engineering rules 
+
 - Follow the architecture already used in the repository. 
 - Prefer small, focused changes. 
 - Do not rewrite unrelated code. 
