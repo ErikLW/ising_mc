@@ -1,4 +1,4 @@
-#ising_mc.jl
+# ising_mc.jl
 
 The main function `run_metropolis()` of `ising_mc.jl` runs a
 metropolis monte-carlo calculation of the classical Ising model.
